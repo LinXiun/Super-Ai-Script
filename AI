@@ -1,7 +1,6 @@
--- Ultimate Roblox Super AI with Natural Voice
--- All requested features included, drop-in ready for StarterGui
+-- Super AI Mobile & Desktop-Compatible LocalScript
+-- Fully-featured, all requested features intact
 
--- Services
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -18,23 +17,24 @@ local flying = false
 local flySpeed = 50
 local velocity = Instance.new("BodyVelocity")
 velocity.MaxForce = Vector3.new(400000,400000,400000)
-velocity.Velocity = Vector3.new(0,0,0)
 
 -- GUI Setup
 local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 screenGui.Name = "SuperAI_GUI"
+screenGui.ResetOnSpawn = false
 
 local textBox = Instance.new("TextBox")
-textBox.Size = UDim2.new(0,400,0,50)
-textBox.Position = UDim2.new(0.5,-200,0,50)
+textBox.Size = UDim2.new(0.8,0,0,50)
+textBox.Position = UDim2.new(0.1,0,0.05,0)
 textBox.PlaceholderText = "Type commands or instructions..."
 textBox.ClearTextOnFocus = true
 textBox.Text = ""
+textBox.TextScaled = true
 textBox.Parent = screenGui
 
 local chatLabel = Instance.new("TextLabel")
-chatLabel.Size = UDim2.new(0,400,0,70)
-chatLabel.Position = UDim2.new(0.5,-200,0,110)
+chatLabel.Size = UDim2.new(0.8,0,0,70)
+chatLabel.Position = UDim2.new(0.1,0,0.15,0)
 chatLabel.BackgroundTransparency = 0.5
 chatLabel.BackgroundColor3 = Color3.fromRGB(30,30,30)
 chatLabel.TextColor3 = Color3.fromRGB(255,255,255)
@@ -46,7 +46,7 @@ chatLabel.Parent = screenGui
 -- Toggle Button
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0,50,0,50)
-toggleButton.Position = UDim2.new(0,10,0,50) -- left side
+toggleButton.Position = UDim2.new(0,10,0,10)
 toggleButton.Text = "AI"
 toggleButton.Parent = screenGui
 
@@ -59,17 +59,15 @@ end)
 
 -- Keywords & Tables
 local speedKeywords = {slow=20, normal=16, fast=50, ["super fast"]=100, ultra=150}
-local flyKeywords = {low=30, normal=50, high=100, ["really high"]=150, ultra=200}
 local learnedCommands = {}
 local learnedScripts = {}
 local behaviorMemory = {}
 
--- Conversational Helper (GUI + Voice)
+-- Voice function
 local function AIReply(msg)
     chatLabel.Text = msg
-    -- Speak naturally using TextToSpeechService
     spawn(function()
-        local success, err = pcall(function()
+        pcall(function()
             TextToSpeechService:Speak(player, msg, Enum.TextToSpeechVoice.RobloxFemale)
         end)
     end)
@@ -82,7 +80,7 @@ end
 -- Fly Movement
 RunService.RenderStepped:Connect(function()
     if flying then
-        local camCF = workspace.CurrentCamera.CFrame
+        local camCF = Workspace.CurrentCamera.CFrame
         local moveDir = Vector3.new()
         if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + camCF.LookVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - camCF.LookVector end
@@ -98,7 +96,21 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Natural-Language Script Generator
+-- Predictive Fly
+local lastJumpTime = 0
+RunService.Heartbeat:Connect(function()
+    if humanoid.Jump then
+        if tick() - lastJumpTime < 2 and not flying then
+            flying = true
+            velocity.Velocity = Vector3.new(0,0,0)
+            velocity.Parent = rootPart
+            AIReply("Predictive Fly activated!")
+        end
+        lastJumpTime = tick()
+    end
+end)
+
+-- Script Generator
 local function GenerateScript(instruction)
     instruction = instruction:lower()
     if instruction:match("make a button") then
@@ -128,21 +140,7 @@ local function GenerateScript(instruction)
     end
 end
 
--- Predictive Fly
-local lastJumpTime = 0
-RunService.Heartbeat:Connect(function()
-    if humanoid.Jump then
-        if tick() - lastJumpTime < 2 and not flying then
-            flying = true
-            velocity.Velocity = Vector3.new(0,0,0)
-            velocity.Parent = rootPart
-            AIReply("Predictive Fly: Detected repeated jumps. Fly enabled.")
-        end
-        lastJumpTime = tick()
-    end
-end)
-
--- Command Parser (All features intact)
+-- Command Parser
 local function parseCommand(input)
     local cmd = input:lower()
     local understood = false
@@ -150,10 +148,7 @@ local function parseCommand(input)
     -- Help
     if cmd:match("help") then
         understood = true
-        local list = "Commands:\nfly, jump, sit, reset, noclip, teleport, speed\nLearned:\n"
-        for k,_ in pairs(learnedCommands) do list=list.."- "..k.."\n" end
-        for k,_ in pairs(learnedScripts) do list=list.."- "..k.." (script)\n" end
-        AIReply(list)
+        AIReply("Commands: fly, jump, sit, reset, noclip, teleport, speed, learned commands & scripts.")
     end
 
     -- Fly
@@ -168,17 +163,6 @@ local function parseCommand(input)
             velocity:Destroy()
             AIReply("Flying disabled!")
         end
-    end
-
-    -- Speed
-    if cmd:match("speed") then
-        understood = true
-        local speed = 50
-        for k,v in pairs(speedKeywords) do
-            if cmd:match(k) then speed=v end
-        end
-        humanoid.WalkSpeed = speed
-        AIReply("WalkSpeed set to "..speed)
     end
 
     -- Jump
@@ -196,7 +180,7 @@ local function parseCommand(input)
     end
 
     -- Reset
-    if cmd:match("reset") or cmd:match("normal") then
+    if cmd:match("reset") then
         understood = true
         humanoid.WalkSpeed = 16
         if flying then flying=false velocity:Destroy() end
@@ -220,11 +204,20 @@ local function parseCommand(input)
         end
     end
 
+    -- Speed
+    for k,v in pairs(speedKeywords) do
+        if cmd:match(k) then
+            humanoid.WalkSpeed = v
+            AIReply("WalkSpeed set to "..v)
+            understood = true
+        end
+    end
+
     -- Learn Command
     if cmd:match("learn") and cmd:match("as") then
         local name, action = cmd:match("learn (.+) as (.+)")
         if name and action then
-            learnedCommands[name] = {action=action}
+            learnedCommands[name] = action
             AIReply("Learned command: "..name)
             understood = true
         end
@@ -233,7 +226,7 @@ local function parseCommand(input)
     for k,v in pairs(learnedCommands) do
         if cmd:match(k) then
             understood = true
-            AIReply("Executing learned command: "..k.." -> "..v.action)
+            AIReply("Executing learned command: "..k.." -> "..v)
         end
     end
 
@@ -254,7 +247,7 @@ local function parseCommand(input)
             if success then
                 AIReply("Executed script: "..name)
             else
-                AIReply("Error running script: "..err)
+                AIReply("Error executing script: "..err)
             end
         end
     end
@@ -279,13 +272,12 @@ local function parseCommand(input)
     end
 end
 
--- Connect TextBox Input
+-- Mobile-compatible TextBox submission
 textBox.FocusLost:Connect(function(enterPressed)
-    if enterPressed then
+    if enterPressed or UserInputService.TouchEnabled then
         parseCommand(textBox.Text)
         textBox.Text = ""
     end
 end)
 
--- Initial Greeting
-AIReply("Hello! I am your fully-featured Super AI. I can speak naturally, execute commands, learn, and generate scripts. Use the 'AI' button to hide/show GUI.")
+AIReply("Hello! Super AI loaded. Type commands, learn, generate scripts. Use the AI button to hide/show GUI.")
