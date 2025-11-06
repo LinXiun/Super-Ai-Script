@@ -1,16 +1,17 @@
--- Super AI Mobile & Desktop-Compatible LocalScript
--- Fully-featured, all requested features intact
-
+-- Super AI LocalScript (Guaranteed to execute, Mobile + PC)
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local TextToSpeechService = game:GetService("TextToSpeechService")
 
 local player = Players.LocalPlayer
+
+-- Wait for Character & PlayerGui
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 local rootPart = character:WaitForChild("HumanoidRootPart")
+local playerGui = player:WaitForChild("PlayerGui")
 
 -- Fly Setup
 local flying = false
@@ -18,8 +19,13 @@ local flySpeed = 50
 local velocity = Instance.new("BodyVelocity")
 velocity.MaxForce = Vector3.new(400000,400000,400000)
 
--- GUI Setup
-local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+-- Tables
+local speedKeywords = {slow=20, normal=16, fast=50, ["super fast"]=100, ultra=150}
+local learnedCommands = {}
+local learnedScripts = {}
+
+-- GUI
+local screenGui = Instance.new("ScreenGui", playerGui)
 screenGui.Name = "SuperAI_GUI"
 screenGui.ResetOnSpawn = false
 
@@ -28,7 +34,6 @@ textBox.Size = UDim2.new(0.8,0,0,50)
 textBox.Position = UDim2.new(0.1,0,0.05,0)
 textBox.PlaceholderText = "Type commands or instructions..."
 textBox.ClearTextOnFocus = true
-textBox.Text = ""
 textBox.TextScaled = true
 textBox.Parent = screenGui
 
@@ -43,7 +48,7 @@ chatLabel.TextWrapped = true
 chatLabel.Text = ""
 chatLabel.Parent = screenGui
 
--- Toggle Button
+-- Toggle GUI button
 local toggleButton = Instance.new("TextButton")
 toggleButton.Size = UDim2.new(0,50,0,50)
 toggleButton.Position = UDim2.new(0,10,0,10)
@@ -57,13 +62,7 @@ toggleButton.MouseButton1Click:Connect(function()
     chatLabel.Visible = guiVisible
 end)
 
--- Keywords & Tables
-local speedKeywords = {slow=20, normal=16, fast=50, ["super fast"]=100, ultra=150}
-local learnedCommands = {}
-local learnedScripts = {}
-local behaviorMemory = {}
-
--- Voice function
+-- AI reply (GUI + Voice)
 local function AIReply(msg)
     chatLabel.Text = msg
     spawn(function()
@@ -77,7 +76,7 @@ local function AIReply(msg)
     end)
 end
 
--- Fly Movement
+-- Fly movement
 RunService.RenderStepped:Connect(function()
     if flying then
         local camCF = Workspace.CurrentCamera.CFrame
@@ -88,11 +87,7 @@ RunService.RenderStepped:Connect(function()
         if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + camCF.RightVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0,1,0) end
         if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0,1,0) end
-        if moveDir.Magnitude > 0 then
-            velocity.Velocity = moveDir.Unit * flySpeed
-        else
-            velocity.Velocity = Vector3.new(0,0,0)
-        end
+        velocity.Velocity = moveDir.Magnitude > 0 and moveDir.Unit*flySpeed or Vector3.new(0,0,0)
     end
 end)
 
@@ -100,7 +95,7 @@ end)
 local lastJumpTime = 0
 RunService.Heartbeat:Connect(function()
     if humanoid.Jump then
-        if tick() - lastJumpTime < 2 and not flying then
+        if tick()-lastJumpTime < 2 and not flying then
             flying = true
             velocity.Velocity = Vector3.new(0,0,0)
             velocity.Parent = rootPart
@@ -110,7 +105,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Script Generator
+-- Script generator
 local function GenerateScript(instruction)
     instruction = instruction:lower()
     if instruction:match("make a button") then
@@ -140,56 +135,28 @@ local function GenerateScript(instruction)
     end
 end
 
--- Command Parser
+-- Command parser
 local function parseCommand(input)
     local cmd = input:lower()
     local understood = false
 
-    -- Help
     if cmd:match("help") then
         understood = true
         AIReply("Commands: fly, jump, sit, reset, noclip, teleport, speed, learned commands & scripts.")
     end
 
-    -- Fly
     if cmd:match("fly") then
-        understood = true
         flying = not flying
-        if flying then
-            velocity.Velocity = Vector3.new(0,0,0)
-            velocity.Parent = rootPart
-            AIReply("Flying enabled!")
-        else
-            velocity:Destroy()
-            AIReply("Flying disabled!")
-        end
-    end
-
-    -- Jump
-    if cmd:match("jump") then
+        if flying then velocity.Velocity = Vector3.new(0,0,0); velocity.Parent = rootPart; AIReply("Flying enabled!") 
+        else velocity:Destroy(); AIReply("Flying disabled!") end
         understood = true
-        humanoid.Jump = true
-        AIReply("Jumped!")
     end
 
-    -- Sit
-    if cmd:match("sit") then
-        understood = true
-        humanoid.Sit = true
-        AIReply("Sitting now")
-    end
+    if cmd:match("jump") then humanoid.Jump=true; AIReply("Jumped!"); understood=true end
+    if cmd:match("sit") then humanoid.Sit=true; AIReply("Sitting now"); understood=true end
+    if cmd:match("reset") then humanoid.WalkSpeed=16; if flying then flying=false velocity:Destroy() end; AIReply("Reset speed and flying"); understood=true end
 
-    -- Reset
-    if cmd:match("reset") then
-        understood = true
-        humanoid.WalkSpeed = 16
-        if flying then flying=false velocity:Destroy() end
-        AIReply("Reset speed and flying")
-    end
-
-    -- Teleport
     if cmd:match("teleport") then
-        understood = true
         local targetName = cmd:match("to (%w+)")
         if targetName then
             local targetPlayer = Players:FindFirstChild(targetName)
@@ -199,80 +166,52 @@ local function parseCommand(input)
             else
                 AIReply("Cannot find player "..targetName)
             end
-        else
-            AIReply("Specify player. Example: 'Teleport me to PlayerName'")
-        end
+        else AIReply("Specify player. Example: 'Teleport me to PlayerName'") end
+        understood = true
     end
 
-    -- Speed
     for k,v in pairs(speedKeywords) do
-        if cmd:match(k) then
-            humanoid.WalkSpeed = v
-            AIReply("WalkSpeed set to "..v)
-            understood = true
-        end
+        if cmd:match(k) then humanoid.WalkSpeed=v; AIReply("WalkSpeed set to "..v); understood=true end
     end
 
-    -- Learn Command
     if cmd:match("learn") and cmd:match("as") then
         local name, action = cmd:match("learn (.+) as (.+)")
-        if name and action then
-            learnedCommands[name] = action
-            AIReply("Learned command: "..name)
-            understood = true
-        end
+        if name and action then learnedCommands[name]=action; AIReply("Learned command: "..name); understood=true end
     end
 
     for k,v in pairs(learnedCommands) do
-        if cmd:match(k) then
-            understood = true
-            AIReply("Executing learned command: "..k.." -> "..v)
-        end
+        if cmd:match(k) then AIReply("Executing learned command: "..k.." -> "..v); understood=true end
     end
 
-    -- Learn Script
     if cmd:match("script") and cmd:match("as") then
         local name, code = cmd:match("script (.+) as (.+)")
-        if name and code then
-            learnedScripts[name] = code
-            AIReply("Learned script: "..name)
-            understood = true
-        end
+        if name and code then learnedScripts[name]=code; AIReply("Learned script: "..name); understood=true end
     end
 
     for name, code in pairs(learnedScripts) do
         if cmd:match(name) then
-            understood = true
             local success, err = pcall(function() loadstring(code)() end)
-            if success then
-                AIReply("Executed script: "..name)
-            else
-                AIReply("Error executing script: "..err)
-            end
+            if success then AIReply("Executed script: "..name)
+            else AIReply("Error executing script: "..err) end
+            understood=true
         end
     end
 
-    -- On-the-spot Script Generation
     if cmd:match("generate script") or cmd:match("create") then
         local instruction = cmd:match("generate script (.+)") or cmd:match("create (.+)")
         if instruction then
             local code = GenerateScript(instruction)
             local success, err = pcall(function() loadstring(code)() end)
-            if success then
-                AIReply("Generated and executed script for: "..instruction)
-            else
-                AIReply("Error executing generated script: "..err)
-            end
-            understood = true
+            if success then AIReply("Generated and executed script for: "..instruction)
+            else AIReply("Error executing generated script: "..err) end
+            understood=true
         end
     end
 
-    if not understood then
-        AIReply("I didn't understand that. Type 'help' for commands.")
-    end
+    if not understood then AIReply("I didn't understand that. Type 'help' for commands.") end
 end
 
--- Mobile-compatible TextBox submission
+-- Mobile + PC TextBox input
 textBox.FocusLost:Connect(function(enterPressed)
     if enterPressed or UserInputService.TouchEnabled then
         parseCommand(textBox.Text)
